@@ -1,11 +1,11 @@
 import asyncio
 import os
 import json
-import random
 from telethon import TelegramClient, errors
-from telethon.errors import SessionPasswordNeededError
+from telethon.errors import SessionPasswordNeededError, ChannelPrivateError, PeerIdInvalidError
 from telethon.tl.functions.channels import LeaveChannelRequest
 from telethon.tl.functions.messages import GetHistoryRequest
+from telethon.tl.types import InputPeerChat, InputPeerChannel
 from colorama import init, Fore
 import pyfiglet
 
@@ -35,34 +35,6 @@ def display_banner():
     print(Fore.RED + pyfiglet.figlet_format("MEGIX OTT"))
     print(Fore.GREEN + "Made by @Megix_OTT\n")
 
-# Function to forward messages and leave non-messageable groups
-async def forward_messages_to_groups(client, last_message, session_name):
-    group_count = 0
-    async for dialog in client.iter_dialogs():
-        if dialog.is_group:
-            group = dialog.entity
-            try:
-                await client.forward_messages(group, last_message)
-                print(Fore.GREEN + f"Message forwarded to {group.title} using {session_name}")
-            except Exception as e:
-                # If message cannot be sent, leave the group
-                print(Fore.RED + f"Failed to forward message to {group.title}. Leaving the group: {str(e)}")
-                await client(LeaveChannelRequest(group))
-                print(Fore.YELLOW + f"Left group {group.title}")
-            
-            group_count += 1
-
-            # Introduce a random delay between 15 to 30 seconds to reduce the chances of being banned
-            delay = random.randint(15, 30)
-            print(f"Waiting for {delay} seconds before forwarding to the next group...")
-            await asyncio.sleep(delay)
-
-            # Introduce a longer delay after every 10 to 15 groups
-            if group_count % random.randint(10, 15) == 0:
-                long_delay = random.randint(60, 120)
-                print(f"Completed {group_count} groups. Waiting for {long_delay} seconds to reduce the risk of being banned...")
-                await asyncio.sleep(long_delay)
-
 # Function to login and forward messages
 async def login_and_forward(api_id, api_hash, phone_number, session_name):
     client = TelegramClient(session_name, api_id, api_hash)
@@ -78,7 +50,7 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
         await client.sign_in(password=password)
 
     saved_messages_peer = await client.get_input_entity('me')
-
+    
     # Corrected GetHistoryRequest with missing arguments
     history = await client(GetHistoryRequest(
         peer=saved_messages_peer,
@@ -100,10 +72,37 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
     # Ask how many times and delay after login
     repeat_count = int(input(f"How many times do you want to send the message to all groups for {session_name}? "))
     delay_between_rounds = int(input(f"Enter the delay (in seconds) between each round for {session_name}: "))
+    group_delay = int(input(f"Enter the delay (in seconds) between each group: "))
 
     for round_num in range(1, repeat_count + 1):
         print(f"\nStarting round {round_num} of forwarding messages to all groups for {session_name}.")
-        await forward_messages_to_groups(client, last_message, session_name)
+
+        group_count = 0
+        async for dialog in client.iter_dialogs():
+            if dialog.is_group:
+                group = dialog.entity
+                try:
+                    # Only forward if the group is accessible and not private
+                    await client.forward_messages(group, last_message)
+                    print(Fore.GREEN + f"Message forwarded to {group.title} using {session_name}")
+                except ChannelPrivateError:
+                    print(Fore.RED + f"Failed to forward message to {group.title}: Channel is private or you were banned.")
+                    await leave_group_if_needed(client, group)
+                except PeerIdInvalidError:
+                    print(Fore.RED + f"Invalid peer for {group.title}. Skipping.")
+                except Exception as e:
+                    print(Fore.RED + f"Failed to forward message to {group.title}: {str(e)}")
+                    await leave_group_if_needed(client, group)
+
+                group_count += 1
+                # Introduce delay between groups
+                await asyncio.sleep(group_delay)
+
+                # Add longer delay after 10-15 groups
+                if group_count % 10 == 0:
+                    longer_delay = int(input(f"Enter the longer delay (in seconds) after every 10 groups: "))
+                    print(f"Applying longer delay of {longer_delay} seconds.")
+                    await asyncio.sleep(longer_delay)
 
         if round_num < repeat_count:
             print(f"Delaying for {delay_between_rounds} seconds before the next round.")
@@ -112,17 +111,18 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
     await client.disconnect()
 
 # Function to leave groups where you can't send messages
-async def leave_unwanted_groups(client):
-    async for dialog in client.iter_dialogs():
-        if dialog.is_group:
-            group = dialog.entity
-            try:
-                await client.send_message(group.id, "Dm For Buy @Megix_Ott")
-                print(Fore.GREEN + f"Message sent to {group.title}")
-            except Exception as e:
-                print(Fore.RED + f"Leaving {group.title} as message sending failed: {e}")
-                await client(LeaveChannelRequest(group))
-                print(Fore.YELLOW + f"Left group {group.title}")
+async def leave_group_if_needed(client, group):
+    try:
+        await client.send_message(group.id, "Dm For Buy @Megix_Ott")
+        print(Fore.GREEN + f"Message sent to {group.title}")
+    except PeerIdInvalidError:
+        print(Fore.RED + f"Invalid peer for {group.title}. Cannot leave.")
+    except ChannelPrivateError:
+        print(Fore.RED + f"Cannot access {group.title} (it's private or you're banned). Leaving group.")
+        await client(LeaveChannelRequest(group))
+    except Exception as e:
+        print(Fore.RED + f"Leaving {group.title} due to failure: {e}")
+        await client(LeaveChannelRequest(group))
 
 async def main():
     display_banner()
