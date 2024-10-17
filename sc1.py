@@ -36,15 +36,13 @@ def display_banner():
     print(Fore.RED + pyfiglet.figlet_format("MEGIX OTT"))
     print(Fore.GREEN + "Made by @Megix_OTT\n")
 
-# Free public proxy list
+# List of free proxies (SOCKS5)
 proxies = [
-    ('socks5', '51.15.227.220', 1080),
-    ('socks5', '64.225.8.54', 1080),
-    ('socks5', '138.68.60.8', 1080),
-    ('socks5', '138.68.109.12', 1080),
-    ('socks5', '51.79.50.31', 1080),
-    ('socks5', '178.62.193.19', 1080),
-    ('socks5', '176.31.219.45', 1080),
+    ('socks5', '185.6.233.134', 1080),
+    ('socks5', '104.248.109.17', 1080),
+    ('socks5', '51.79.146.255', 1080),
+    ('socks5', '95.179.167.38', 1080),
+    ('socks5', '185.207.232.59', 1080)
 ]
 
 # Function to get a random proxy
@@ -52,7 +50,7 @@ def get_random_proxy():
     return random.choice(proxies)
 
 # Function to login and forward messages
-async def login_and_forward(api_id, api_hash, phone_number, session_name):
+async def login_and_forward(api_id, api_hash, phone_number, session_name, max_messages_per_hour):
     proxy = get_random_proxy()  # Get a random proxy
     client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
 
@@ -86,6 +84,10 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
     last_message = history.messages[0]
 
     repeat_count = int(input(f"How many times do you want to send the message to all groups for {session_name}? "))
+    delay_after_all_groups = random.randint(60, 120)
+
+    total_messages_sent = 0
+    start_time = time.time()
 
     for round_num in range(1, repeat_count + 1):
         print(f"\nStarting round {round_num} of forwarding messages to all groups for {session_name}.")
@@ -93,10 +95,20 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
         group_count = 0
         async for dialog in client.iter_dialogs():
             if dialog.is_group:
+                if total_messages_sent >= max_messages_per_hour:
+                    elapsed_time = time.time() - start_time
+                    if elapsed_time < 3600:  # 3600 seconds = 1 hour
+                        wait_time = 3600 - elapsed_time
+                        print(f"Reached maximum messages per hour. Waiting for {wait_time} seconds.")
+                        await asyncio.sleep(wait_time)
+                    total_messages_sent = 0
+                    start_time = time.time()  # Reset the timer
+
                 group = dialog.entity
                 try:
                     await client.forward_messages(group, last_message)
                     print(Fore.GREEN + f"Message forwarded to {group.title} using {session_name}")
+                    total_messages_sent += 1
                 except ChannelPrivateError:
                     print(Fore.RED + f"Failed to forward message to {group.title}: Channel is private or you were banned.")
                     await leave_group_if_needed(client, group)
@@ -114,21 +126,19 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
                 # Rotate proxy every 10 groups
                 if group_count % 10 == 0:
                     print("Switching to a new proxy...")
-                    client = await rotate_proxy(client, session_name, api_id, api_hash, phone_number)
+                    proxy = get_random_proxy()
+                    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
+                    await client.start(phone=phone_number)
 
-        delay_after_all_groups = random.randint(60, 120)
+                if group_count % 20 == 0:
+                    longer_delay = random.randint(20, 40)
+                    print(f"Applying longer delay of {longer_delay} seconds after {group_count} groups.")
+                    await asyncio.sleep(longer_delay)
+
         print(f"Delaying for {delay_after_all_groups} seconds before the next round.")
         await asyncio.sleep(delay_after_all_groups)
 
     await client.disconnect()
-
-# Function to rotate proxy
-async def rotate_proxy(client, session_name, api_id, api_hash, phone_number):
-    print("Switching to a new proxy...")
-    proxy = get_random_proxy()  # Get a new random proxy from the list
-    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
-    await client.start(phone=phone_number)
-    return client
 
 # Function to leave groups where you can't send messages
 async def leave_group_if_needed(client, group):
@@ -148,6 +158,7 @@ async def main():
     display_banner()
 
     num_sessions = int(input("Enter how many sessions you want to log in: "))
+    max_messages_per_hour = int(input("Enter the maximum messages to send per hour: "))
     tasks = []
 
     for i in range(1, num_sessions + 1):
@@ -174,7 +185,7 @@ async def main():
 
         choice = int(input(f"\nSelect action for session {i}:\n1. AutoSender\n2. Leave Groups\nEnter choice: "))
         if choice == 1:
-            tasks.append(login_and_forward(api_id, api_hash, phone_number, session_name))
+            tasks.append(login_and_forward(api_id, api_hash, phone_number, session_name, max_messages_per_hour))
         elif choice == 2:
             client = TelegramClient(session_name, api_id, api_hash)
             await client.start(phone=phone_number)
