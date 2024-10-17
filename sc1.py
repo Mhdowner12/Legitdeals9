@@ -36,23 +36,9 @@ def display_banner():
     print(Fore.RED + pyfiglet.figlet_format("MEGIX OTT"))
     print(Fore.GREEN + "Made by @Megix_OTT\n")
 
-# List of free proxies (SOCKS5)
-proxies = [
-    ('socks5', '185.6.233.134', 1080),
-    ('socks5', '104.248.109.17', 1080),
-    ('socks5', '51.79.146.255', 1080),
-    ('socks5', '95.179.167.38', 1080),
-    ('socks5', '185.207.232.59', 1080)
-]
-
-# Function to get a random proxy
-def get_random_proxy():
-    return random.choice(proxies)
-
 # Function to login and forward messages
 async def login_and_forward(api_id, api_hash, phone_number, session_name):
-    proxy = get_random_proxy()  # Get a random proxy
-    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
+    client = TelegramClient(session_name, api_id, api_hash)
 
     await client.start(phone=phone_number)
 
@@ -113,13 +99,6 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
                 delay_between_groups = random.randint(5, 15)
                 print(f"Delaying for {delay_between_groups} seconds before next group.")
                 await asyncio.sleep(delay_between_groups)
-
-                # Rotate proxy every 5 groups
-                if group_count % 5 == 0:
-                    print("Switching to a new proxy...")
-                    proxy = get_random_proxy()
-                    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
-                    await client.start(phone=phone_number)
 
                 if group_count % 10 == 0:
                     longer_delay = random.randint(20, 40)
