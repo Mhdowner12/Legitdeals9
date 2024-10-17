@@ -37,7 +37,7 @@ def display_banner():
     print(Fore.GREEN + "Made by @Megix_OTT\n")
 
 # Function to login and forward messages
-async def login_and_forward(api_id, api_hash, phone_number, session_name):
+async def login_and_forward(api_id, api_hash, phone_number, session_name, repeat_count, delay_after_all_groups):
     client = TelegramClient(session_name, api_id, api_hash)
 
     await client.start(phone=phone_number)
@@ -68,10 +68,7 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
         return
 
     last_message = history.messages[0]
-
-    repeat_count = 5  # Automatically repeat the message 5 times
-    delay_after_all_groups = random.randint(60, 120)
-
+    
     total_messages_sent = 0
     start_time = time.time()
 
@@ -96,12 +93,12 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
                     await leave_group_if_needed(client, group)
 
                 group_count += 1
-                delay_between_groups = random.randint(5, 15)
+                delay_between_groups = random.randint(10, 15)
                 print(f"Delaying for {delay_between_groups} seconds before next group.")
                 await asyncio.sleep(delay_between_groups)
 
-                if group_count % 10 == 0:
-                    longer_delay = random.randint(20, 40)
+                if group_count % 15 == 0:
+                    longer_delay = random.randint(20, 30)
                     print(f"Applying longer delay of {longer_delay} seconds after {group_count} groups.")
                     await asyncio.sleep(longer_delay)
 
@@ -152,9 +149,12 @@ async def main():
             }
             save_credentials(session_name, credentials)
 
+        repeat_count = int(input(f"How many rounds to forward messages for session {i}? "))
+        delay_after_all_groups = int(input(f"Enter delay (in seconds) after forwarding to all groups for session {i}: "))
+        
         choice = int(input(f"\nSelect action for session {i}:\n1. AutoSender\n2. Leave Groups\nEnter choice: "))
         if choice == 1:
-            tasks.append(login_and_forward(api_id, api_hash, phone_number, session_name))
+            tasks.append(login_and_forward(api_id, api_hash, phone_number, session_name, repeat_count, delay_after_all_groups))
         elif choice == 2:
             client = TelegramClient(session_name, api_id, api_hash)
             await client.start(phone=phone_number)
