@@ -34,7 +34,7 @@ def load_credentials(session_name):
 # Function to display banner
 def display_banner():
     print(Fore.RED + pyfiglet.figlet_format("MEGIX OTT"))
-    print(Fore.GREEN + "Made by @Megix_OTT\n")
+    print(Fore.GREEN + "Made by @Megix_Ott\n")
 
 # Function to login and forward messages
 async def login_and_forward(api_id, api_hash, phone_number, session_name, repeat_count, delay_after_all_groups):
@@ -120,6 +120,17 @@ async def leave_group_if_needed(client, group):
     except Exception as e:
         print(Fore.RED + f"Leaving {group.title} due to failure: {e}")
         await client(LeaveChannelRequest(group))
+
+# Function to leave all unwanted groups
+async def leave_unwanted_groups(client):
+    async for dialog in client.iter_dialogs():
+        if dialog.is_group:
+            group = dialog.entity
+            try:
+                print(f"Leaving group: {group.title}")
+                await client(LeaveChannelRequest(group))
+            except Exception as e:
+                print(Fore.RED + f"Failed to leave {group.title}: {e}")
 
 async def main():
     display_banner()
