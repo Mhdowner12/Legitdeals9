@@ -148,7 +148,7 @@ async def leave_group_if_needed(client, group):
 async def main():
     display_banner()
 
-    num_sessions = 3  # Automatically login with 3 sessions
+    num_sessions = int(input("How many sessions would you like to log in? "))  # Ask for the number of sessions
     tasks = []
 
     for i in range(1, num_sessions + 1):
@@ -173,7 +173,13 @@ async def main():
             }
             save_credentials(session_name, credentials)
 
-        tasks.append(login_and_forward(api_id, api_hash, phone_number, session_name))
+        choice = int(input(f"\nSelect action for session {i}:\n1. AutoSender\n2. Leave Groups\nEnter choice: "))
+        if choice == 1:
+            tasks.append(login_and_forward(api_id, api_hash, phone_number, session_name))
+        elif choice == 2:
+            client = TelegramClient(session_name, api_id, api_hash)
+            await client.start(phone=phone_number)
+            tasks.append(leave_unwanted_groups(client))
 
     await asyncio.gather(*tasks)
 
