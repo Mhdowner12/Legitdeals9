@@ -50,7 +50,7 @@ def get_random_proxy():
     return random.choice(proxies)
 
 # Function to login and forward messages
-async def login_and_forward(api_id, api_hash, phone_number, session_name, max_messages_per_hour):
+async def login_and_forward(api_id, api_hash, phone_number, session_name):
     proxy = get_random_proxy()  # Get a random proxy
     client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
 
@@ -83,7 +83,7 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name, max_me
 
     last_message = history.messages[0]
 
-    repeat_count = int(input(f"How many times do you want to send the message to all groups for {session_name}? "))
+    repeat_count = 5  # Automatically repeat the message 5 times
     delay_after_all_groups = random.randint(60, 120)
 
     total_messages_sent = 0
@@ -95,15 +95,6 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name, max_me
         group_count = 0
         async for dialog in client.iter_dialogs():
             if dialog.is_group:
-                if total_messages_sent >= max_messages_per_hour:
-                    elapsed_time = time.time() - start_time
-                    if elapsed_time < 3600:  # 3600 seconds = 1 hour
-                        wait_time = 3600 - elapsed_time
-                        print(f"Reached maximum messages per hour. Waiting for {wait_time} seconds.")
-                        await asyncio.sleep(wait_time)
-                    total_messages_sent = 0
-                    start_time = time.time()  # Reset the timer
-
                 group = dialog.entity
                 try:
                     await client.forward_messages(group, last_message)
@@ -123,14 +114,14 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name, max_me
                 print(f"Delaying for {delay_between_groups} seconds before next group.")
                 await asyncio.sleep(delay_between_groups)
 
-                # Rotate proxy every 10 groups
-                if group_count % 10 == 0:
+                # Rotate proxy every 5 groups
+                if group_count % 5 == 0:
                     print("Switching to a new proxy...")
                     proxy = get_random_proxy()
                     client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
                     await client.start(phone=phone_number)
 
-                if group_count % 20 == 0:
+                if group_count % 10 == 0:
                     longer_delay = random.randint(20, 40)
                     print(f"Applying longer delay of {longer_delay} seconds after {group_count} groups.")
                     await asyncio.sleep(longer_delay)
@@ -157,8 +148,7 @@ async def leave_group_if_needed(client, group):
 async def main():
     display_banner()
 
-    num_sessions = int(input("Enter how many sessions you want to log in: "))
-    max_messages_per_hour = int(input("Enter the maximum messages to send per hour: "))
+    num_sessions = 3  # Automatically login with 3 sessions
     tasks = []
 
     for i in range(1, num_sessions + 1):
@@ -183,13 +173,7 @@ async def main():
             }
             save_credentials(session_name, credentials)
 
-        choice = int(input(f"\nSelect action for session {i}:\n1. AutoSender\n2. Leave Groups\nEnter choice: "))
-        if choice == 1:
-            tasks.append(login_and_forward(api_id, api_hash, phone_number, session_name, max_messages_per_hour))
-        elif choice == 2:
-            client = TelegramClient(session_name, api_id, api_hash)
-            await client.start(phone=phone_number)
-            tasks.append(leave_unwanted_groups(client))
+        tasks.append(login_and_forward(api_id, api_hash, phone_number, session_name))
 
     await asyncio.gather(*tasks)
 
