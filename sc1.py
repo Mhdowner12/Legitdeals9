@@ -1,13 +1,14 @@
 import asyncio
 import os
 import json
+import random
 from telethon import TelegramClient, errors
 from telethon.errors import SessionPasswordNeededError, ChannelPrivateError, PeerIdInvalidError
 from telethon.tl.functions.channels import LeaveChannelRequest
 from telethon.tl.functions.messages import GetHistoryRequest
-from telethon.tl.types import InputPeerChat, InputPeerChannel
 from colorama import init, Fore
 import pyfiglet
+import time
 
 # Initialize colorama for colored output
 init(autoreset=True)
@@ -35,23 +36,34 @@ def display_banner():
     print(Fore.RED + pyfiglet.figlet_format("MEGIX OTT"))
     print(Fore.GREEN + "Made by @Megix_OTT\n")
 
+# List of proxies (example)
+proxies = [
+    ('http', 'proxy1.example.com', 8080),
+    ('http', 'proxy2.example.com', 8080),
+    ('socks5', 'proxy3.example.com', 1080),
+]
+
+# Function to get a random proxy
+def get_random_proxy():
+    return random.choice(proxies)
+
 # Function to login and forward messages
-async def login_and_forward(api_id, api_hash, phone_number, session_name):
-    client = TelegramClient(session_name, api_id, api_hash)
+async def login_and_forward(api_id, api_hash, phone_number, session_name, max_messages_per_hour):
+    proxy = get_random_proxy()  # Get a random proxy
+    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
 
     await client.start(phone=phone_number)
 
     try:
-        if await client.is_user_authorized() is False:
+        if not await client.is_user_authorized():
             await client.send_code_request(phone_number)
-            await client.sign_in(phone_number)
+            await client.sign_in(phone=phone_number)
     except SessionPasswordNeededError:
         password = input("Two-factor authentication enabled. Enter your password: ")
         await client.sign_in(password=password)
 
     saved_messages_peer = await client.get_input_entity('me')
     
-    # Corrected GetHistoryRequest with missing arguments
     history = await client(GetHistoryRequest(
         peer=saved_messages_peer,
         limit=1,
@@ -69,10 +81,11 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
 
     last_message = history.messages[0]
 
-    # Ask how many times and delay after login
     repeat_count = int(input(f"How many times do you want to send the message to all groups for {session_name}? "))
-    delay_between_rounds = int(input(f"Enter the delay (in seconds) between each round for {session_name}: "))
-    group_delay = int(input(f"Enter the delay (in seconds) between each group: "))
+    delay_after_all_groups = random.randint(60, 120)
+
+    total_messages_sent = 0
+    start_time = time.time()
 
     for round_num in range(1, repeat_count + 1):
         print(f"\nStarting round {round_num} of forwarding messages to all groups for {session_name}.")
@@ -80,11 +93,20 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
         group_count = 0
         async for dialog in client.iter_dialogs():
             if dialog.is_group:
+                if total_messages_sent >= max_messages_per_hour:
+                    elapsed_time = time.time() - start_time
+                    if elapsed_time < 3600:  # 3600 seconds = 1 hour
+                        wait_time = 3600 - elapsed_time
+                        print(f"Reached maximum messages per hour. Waiting for {wait_time} seconds.")
+                        await asyncio.sleep(wait_time)
+                    total_messages_sent = 0
+                    start_time = time.time()  # Reset the timer
+
                 group = dialog.entity
                 try:
-                    # Only forward if the group is accessible and not private
                     await client.forward_messages(group, last_message)
                     print(Fore.GREEN + f"Message forwarded to {group.title} using {session_name}")
+                    total_messages_sent += 1
                 except ChannelPrivateError:
                     print(Fore.RED + f"Failed to forward message to {group.title}: Channel is private or you were banned.")
                     await leave_group_if_needed(client, group)
@@ -95,18 +117,24 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
                     await leave_group_if_needed(client, group)
 
                 group_count += 1
-                # Introduce delay between groups
-                await asyncio.sleep(group_delay)
+                delay_between_groups = random.randint(5, 15)
+                print(f"Delaying for {delay_between_groups} seconds before next group.")
+                await asyncio.sleep(delay_between_groups)
 
-                # Add longer delay after 10-15 groups
+                # Rotate proxy every 5 groups
+                if group_count % 5 == 0:
+                    print("Switching to a new proxy...")
+                    proxy = get_random_proxy()
+                    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
+                    await client.start(phone=phone_number)
+
                 if group_count % 10 == 0:
-                    longer_delay = int(input(f"Enter the longer delay (in seconds) after every 10 groups: "))
-                    print(f"Applying longer delay of {longer_delay} seconds.")
+                    longer_delay = random.randint(20, 40)
+                    print(f"Applying longer delay of {longer_delay} seconds after {group_count} groups.")
                     await asyncio.sleep(longer_delay)
 
-        if round_num < repeat_count:
-            print(f"Delaying for {delay_between_rounds} seconds before the next round.")
-            await asyncio.sleep(delay_between_rounds)
+        print(f"Delaying for {delay_after_all_groups} seconds before the next round.")
+        await asyncio.sleep(delay_after_all_groups)
 
     await client.disconnect()
 
@@ -127,8 +155,8 @@ async def leave_group_if_needed(client, group):
 async def main():
     display_banner()
 
-    # Load sessions and ask how many to log in
     num_sessions = int(input("Enter how many sessions you want to log in: "))
+    max_messages_per_hour = int(input("Enter the maximum messages to send per hour: "))
     tasks = []
 
     for i in range(1, num_sessions + 1):
@@ -153,10 +181,9 @@ async def main():
             }
             save_credentials(session_name, credentials)
 
-        # Let user choose action
         choice = int(input(f"\nSelect action for session {i}:\n1. AutoSender\n2. Leave Groups\nEnter choice: "))
         if choice == 1:
-            tasks.append(login_and_forward(api_id, api_hash, phone_number, session_name))
+            tasks.append(login_and_forward(api_id, api_hash, phone_number, session_name, max_messages_per_hour))
         elif choice == 2:
             client = TelegramClient(session_name, api_id, api_hash)
             await client.start(phone=phone_number)
