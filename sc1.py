@@ -36,36 +36,25 @@ def display_banner():
     print(Fore.RED + pyfiglet.figlet_format("MEGIX OTT"))
     print(Fore.GREEN + "Made by @Megix_OTT\n")
 
-# Example list of SOCKS5 proxies (replace with paid/private proxies for better reliability)
+# Free public proxy list
 proxies = [
-    ('socks5', 'proxy1.example.com', 1080),
-    ('socks5', 'proxy2.example.com', 1080),
-    ('socks5', 'proxy3.example.com', 1080),
+    ('socks5', '51.15.227.220', 1080),
+    ('socks5', '64.225.8.54', 1080),
+    ('socks5', '138.68.60.8', 1080),
+    ('socks5', '138.68.109.12', 1080),
+    ('socks5', '51.79.50.31', 1080),
+    ('socks5', '178.62.193.19', 1080),
+    ('socks5', '176.31.219.45', 1080),
 ]
 
 # Function to get a random proxy
 def get_random_proxy():
     return random.choice(proxies)
 
-# Function to try connecting with a proxy, retrying up to 3 times
-async def connect_with_proxy(client, proxy, retries=3):
-    for attempt in range(retries):
-        try:
-            client = TelegramClient(client.session, client.api_id, client.api_hash, proxy=proxy)
-            await client.start()
-            return client
-        except Exception as e:
-            print(Fore.RED + f"Proxy connection failed: {e}. Attempt {attempt + 1} of {retries}")
-    print(Fore.RED + "All proxy attempts failed. Continuing without a proxy.")
-    return TelegramClient(client.session, client.api_id, client.api_hash)  # Proceed without a proxy
-
 # Function to login and forward messages
 async def login_and_forward(api_id, api_hash, phone_number, session_name):
     proxy = get_random_proxy()  # Get a random proxy
-    client = TelegramClient(session_name, api_id, api_hash)
-
-    # Try to connect with a proxy
-    client = await connect_with_proxy(client, proxy)
+    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
 
     await client.start(phone=phone_number)
 
@@ -97,7 +86,6 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
     last_message = history.messages[0]
 
     repeat_count = int(input(f"How many times do you want to send the message to all groups for {session_name}? "))
-    delay_after_all_groups = random.randint(60, 120)  # Random delay after each round
 
     for round_num in range(1, repeat_count + 1):
         print(f"\nStarting round {round_num} of forwarding messages to all groups for {session_name}.")
@@ -119,24 +107,28 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
                     await leave_group_if_needed(client, group)
 
                 group_count += 1
-                delay_between_groups = random.randint(5, 15)  # Delay between forwarding to groups
+                delay_between_groups = random.randint(5, 15)
                 print(f"Delaying for {delay_between_groups} seconds before next group.")
                 await asyncio.sleep(delay_between_groups)
 
-                # Rotate proxy and apply longer delay every 10 groups
+                # Rotate proxy every 10 groups
                 if group_count % 10 == 0:
-                    print(f"Completed forwarding to {group_count} groups. Applying longer delay and switching proxy...")
-                    longer_delay = random.randint(30, 60)
-                    await asyncio.sleep(longer_delay)
+                    print("Switching to a new proxy...")
+                    client = await rotate_proxy(client, session_name, api_id, api_hash, phone_number)
 
-                    # Switch to a new proxy
-                    proxy = get_random_proxy()
-                    client = await connect_with_proxy(client, proxy)
-
+        delay_after_all_groups = random.randint(60, 120)
         print(f"Delaying for {delay_after_all_groups} seconds before the next round.")
         await asyncio.sleep(delay_after_all_groups)
 
     await client.disconnect()
+
+# Function to rotate proxy
+async def rotate_proxy(client, session_name, api_id, api_hash, phone_number):
+    print("Switching to a new proxy...")
+    proxy = get_random_proxy()  # Get a new random proxy from the list
+    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
+    await client.start(phone=phone_number)
+    return client
 
 # Function to leave groups where you can't send messages
 async def leave_group_if_needed(client, group):
