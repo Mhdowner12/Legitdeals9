@@ -36,10 +36,10 @@ def display_banner():
     print(Fore.RED + pyfiglet.figlet_format("MEGIX OTT"))
     print(Fore.GREEN + "Made by @Megix_OTT\n")
 
-# List of proxies (example)
+# Example list of SOCKS5 proxies (replace with paid/private proxies for better reliability)
 proxies = [
-    ('http', 'proxy1.example.com', 8080),
-    ('http', 'proxy2.example.com', 8080),
+    ('socks5', 'proxy1.example.com', 1080),
+    ('socks5', 'proxy2.example.com', 1080),
     ('socks5', 'proxy3.example.com', 1080),
 ]
 
@@ -47,10 +47,25 @@ proxies = [
 def get_random_proxy():
     return random.choice(proxies)
 
+# Function to try connecting with a proxy, retrying up to 3 times
+async def connect_with_proxy(client, proxy, retries=3):
+    for attempt in range(retries):
+        try:
+            client = TelegramClient(client.session, client.api_id, client.api_hash, proxy=proxy)
+            await client.start()
+            return client
+        except Exception as e:
+            print(Fore.RED + f"Proxy connection failed: {e}. Attempt {attempt + 1} of {retries}")
+    print(Fore.RED + "All proxy attempts failed. Continuing without a proxy.")
+    return TelegramClient(client.session, client.api_id, client.api_hash)  # Proceed without a proxy
+
 # Function to login and forward messages
 async def login_and_forward(api_id, api_hash, phone_number, session_name):
     proxy = get_random_proxy()  # Get a random proxy
-    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
+    client = TelegramClient(session_name, api_id, api_hash)
+
+    # Try to connect with a proxy
+    client = await connect_with_proxy(client, proxy)
 
     await client.start(phone=phone_number)
 
@@ -116,8 +131,7 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name):
 
                     # Switch to a new proxy
                     proxy = get_random_proxy()
-                    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
-                    await client.start(phone=phone_number)
+                    client = await connect_with_proxy(client, proxy)
 
         print(f"Delaying for {delay_after_all_groups} seconds before the next round.")
         await asyncio.sleep(delay_after_all_groups)
