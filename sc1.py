@@ -1,9 +1,9 @@
-import asyncio  # Make sure asyncio is imported
+import asyncio  # Ensure asyncio is imported correctly
 import os
 import json
 import random
 from telethon import TelegramClient, errors
-from telethon.errors import SessionPasswordNeededError, ChannelPrivateError, PeerIdInvalidError
+from telethon.errors import SessionPasswordNeededError, ChannelPrivateError, PeerIdInvalidError, FloodWaitError
 from telethon.tl.functions.channels import LeaveChannelRequest
 from telethon.tl.functions.messages import GetHistoryRequest
 from colorama import init, Fore
@@ -36,7 +36,7 @@ def display_banner():
     print(Fore.RED + pyfiglet.figlet_format("MEGIX OTT"))
     print(Fore.GREEN + "Made by @Megix_Ott\n")
 
-# Function to login and forward messages
+# Function to login and forward messages with flood prevention
 async def login_and_forward(api_id, api_hash, phone_number, session_name, repeat_count, delay_after_all_groups):
     client = TelegramClient(session_name, api_id, api_hash)
 
@@ -70,7 +70,6 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name, repeat
     last_message = history.messages[0]
     
     total_messages_sent = 0
-    start_time = time.time()
 
     for round_num in range(1, repeat_count + 1):
         print(f"\nStarting round {round_num} of forwarding messages to all groups for {session_name}.")
@@ -88,17 +87,23 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name, repeat
                     await leave_group_if_needed(client, group)
                 except PeerIdInvalidError:
                     print(Fore.RED + f"Invalid peer for {group.title}. Skipping.")
+                except FloodWaitError as e:
+                    print(Fore.YELLOW + f"Flood wait error: Pausing for {e.seconds} seconds due to rate limiting.")
+                    await asyncio.sleep(e.seconds)
                 except Exception as e:
                     print(Fore.RED + f"Failed to forward message to {group.title}: {str(e)}")
                     await leave_group_if_needed(client, group)
 
                 group_count += 1
-                delay_between_groups = random.randint(10, 15)
+
+                # Randomize the delay between messages and rounds
+                delay_between_groups = random.randint(15, 30)
                 print(f"Delaying for {delay_between_groups} seconds before next group.")
                 await asyncio.sleep(delay_between_groups)
 
-                if group_count % 15 == 0:
-                    longer_delay = random.randint(20, 30)
+                if group_count % 10 == 0:
+                    # Apply longer delays periodically
+                    longer_delay = random.randint(60, 120)
                     print(f"Applying longer delay of {longer_delay} seconds after {group_count} groups.")
                     await asyncio.sleep(longer_delay)
 
@@ -155,6 +160,7 @@ async def leave_unwanted_groups(client):
             except Exception as e:
                 print(Fore.RED + f"Failed to leave {group.title}: {e}")
 
+# Main logic with dynamic delays to prevent banning
 async def main():
     display_banner()
 
