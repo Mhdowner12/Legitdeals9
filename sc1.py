@@ -1,6 +1,7 @@
-import asyncio  # Ensure asyncio is imported correctly
+import asyncio
 import os
 import json
+import random  # Import random module for delays
 from telethon import TelegramClient, errors
 from telethon.errors import SessionPasswordNeededError, ChannelPrivateError, PeerIdInvalidError, FloodWaitError
 from telethon.tl.functions.channels import LeaveChannelRequest
@@ -125,6 +126,29 @@ async def leave_group_if_needed(client, group):
         print(Fore.RED + f"Leaving {group.title} due to failure: {e}")
         await client(LeaveChannelRequest(group))
 
+# Additional option to send a test message and leave groups where sending fails
+async def send_test_message_and_leave(api_id, api_hash, phone_number, session_name):
+    client = TelegramClient(session_name, api_id, api_hash)
+    
+    await client.start(phone=phone_number)
+    
+    test_message = "Dm for Buy @Megix_Ott\nChannel @legitdeals99\nProofs @legitproofs99"
+    
+    async for dialog in client.iter_dialogs():
+        if dialog.is_group:
+            group = dialog.entity
+            try:
+                await client.send_message(group, test_message)
+                print(Fore.GREEN + f"Test message sent to {group.title}")
+            except (ChannelPrivateError, PeerIdInvalidError) as e:
+                print(Fore.RED + f"Cannot send message to {group.title} (banned or access restricted). Leaving group.")
+                await client(LeaveChannelRequest(group))
+            except Exception as e:
+                print(Fore.RED + f"Failed to send message to {group.title}: {str(e)}. Leaving group.")
+                await client(LeaveChannelRequest(group))
+    
+    await client.disconnect()
+
 # Function to leave all unwanted groups
 async def leave_unwanted_groups(client):
     async for dialog in client.iter_dialogs():
@@ -137,7 +161,7 @@ async def leave_unwanted_groups(client):
                 print(Fore.RED + f"Failed to leave {group.title}: {e}")
 
 # Function to leave all joined groups and channels
-async def leave_all_joined(client):
+async def leave_all_groups_and_channels(client):
     async for dialog in client.iter_dialogs():
         if dialog.is_group or dialog.is_channel:
             group_or_channel = dialog.entity
@@ -176,7 +200,7 @@ async def main():
             }
             save_credentials(session_name, credentials)
 
-        choice = int(input(f"\nSelect action for session {i}:\n1. AutoSender\n2. Leave Groups\n3. Leave All Groups and Channels\nEnter choice: "))
+        choice = int(input(f"\nSelect action for session {i}:\n1. AutoSender\n2. Leave Groups\n3. Test Message and Leave\n4. Leave All Groups and Channels\nEnter choice: "))
         if choice == 1:
             repeat_count = int(input(f"How many rounds to forward messages for session {i}? "))
             delay_after_all_groups = int(input(f"Enter delay (in seconds) after forwarding to all groups for session {i}: "))
@@ -186,9 +210,11 @@ async def main():
             await client.start(phone=phone_number)
             tasks.append(leave_unwanted_groups(client))
         elif choice == 3:
+            tasks.append(send_test_message_and_leave(api_id, api_hash, phone_number, session_name))
+        elif choice == 4:
             client = TelegramClient(session_name, api_id, api_hash)
             await client.start(phone=phone_number)
-            tasks.append(leave_all_joined(client))
+            tasks.append(leave_all_groups_and_channels(client))
 
     await asyncio.gather(*tasks)
 
