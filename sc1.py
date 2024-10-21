@@ -96,14 +96,14 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name, repeat
 
                 group_count += 1
 
-                # Randomize the delay between messages to fit within the time limit
-                delay_between_groups = random.randint(15, 20)  # Adjusted to be between 15 and 20 seconds
+                # Adjusted delay for 1 hour target
+                delay_between_groups = 12  # seconds
                 print(f"Delaying for {delay_between_groups} seconds before next group.")
                 await asyncio.sleep(delay_between_groups)
 
                 if group_count % 10 == 0:
-                    # Apply longer delays periodically
-                    longer_delay = random.randint(40, 50)  # Adjusted to be around 45 seconds
+                    # Apply longer delays after every 10 groups
+                    longer_delay = 40  # seconds
                     print(f"Applying longer delay of {longer_delay} seconds after {group_count} groups.")
                     await asyncio.sleep(longer_delay)
 
@@ -126,41 +126,7 @@ async def leave_group_if_needed(client, group):
         print(Fore.RED + f"Leaving {group.title} due to failure: {e}")
         await client(LeaveChannelRequest(group))
 
-# Additional option to send a test message and leave groups where sending fails
-async def send_test_message_and_leave(api_id, api_hash, phone_number, session_name):
-    client = TelegramClient(session_name, api_id, api_hash)
-    
-    await client.start(phone=phone_number)
-    
-    test_message = "Dm for Buy @Megix_Ott\nChannel @legitdeals99\nProofs @legitproofs99"
-    
-    async for dialog in client.iter_dialogs():
-        if dialog.is_group:
-            group = dialog.entity
-            try:
-                await client.send_message(group, test_message)
-                print(Fore.GREEN + f"Test message sent to {group.title}")
-            except (ChannelPrivateError, PeerIdInvalidError) as e:
-                print(Fore.RED + f"Cannot send message to {group.title} (banned or access restricted). Leaving group.")
-                await client(LeaveChannelRequest(group))
-            except Exception as e:
-                print(Fore.RED + f"Failed to send message to {group.title}: {str(e)}. Leaving group.")
-                await client(LeaveChannelRequest(group))
-    
-    await client.disconnect()
-
-# Function to leave all unwanted groups
-async def leave_unwanted_groups(client):
-    async for dialog in client.iter_dialogs():
-        if dialog.is_group:
-            group = dialog.entity
-            try:
-                print(f"Leaving group: {group.title}")
-                await client(LeaveChannelRequest(group))
-            except Exception as e:
-                print(Fore.RED + f"Failed to leave {group.title}: {e}")
-
-# Main logic with dynamic delays to prevent banning
+# Main logic with dynamic delays to meet the time limit
 async def main():
     display_banner()
 
@@ -189,7 +155,7 @@ async def main():
             }
             save_credentials(session_name, credentials)
 
-        choice = int(input(f"\nSelect action for session {i}:\n1. AutoSender\n2. Leave Groups\n3. Test Message and Leave\nEnter choice: "))
+        choice = int(input(f"\nSelect action for session {i}:\n1. AutoSender\n2. Leave Groups\nEnter choice: "))
         if choice == 1:
             repeat_count = int(input(f"How many rounds to forward messages for session {i}? "))
             delay_after_all_groups = int(input(f"Enter delay (in seconds) after forwarding to all groups for session {i}: "))
@@ -198,8 +164,6 @@ async def main():
             client = TelegramClient(session_name, api_id, api_hash)
             await client.start(phone=phone_number)
             tasks.append(leave_unwanted_groups(client))
-        elif choice == 3:
-            tasks.append(send_test_message_and_leave(api_id, api_hash, phone_number, session_name))
 
     await asyncio.gather(*tasks)
 
