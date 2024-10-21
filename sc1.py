@@ -96,14 +96,14 @@ async def login_and_forward(api_id, api_hash, phone_number, session_name, repeat
 
                 group_count += 1
 
-                # Randomize the delay between messages and rounds
-                delay_between_groups = random.randint(15, 30)
+                # Randomize the delay between messages to fit within the time limit
+                delay_between_groups = random.randint(15, 20)  # Adjusted to be between 15 and 20 seconds
                 print(f"Delaying for {delay_between_groups} seconds before next group.")
                 await asyncio.sleep(delay_between_groups)
 
                 if group_count % 10 == 0:
                     # Apply longer delays periodically
-                    longer_delay = random.randint(60, 120)
+                    longer_delay = random.randint(40, 50)  # Adjusted to be around 45 seconds
                     print(f"Applying longer delay of {longer_delay} seconds after {group_count} groups.")
                     await asyncio.sleep(longer_delay)
 
